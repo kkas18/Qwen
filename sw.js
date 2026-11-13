@@ -1,6 +1,7 @@
 /* Siffer service worker — appskall, frakoblet støtte og oppdateringer */
-const VERSION = '1.1.0';
-const SHELL_CACHE = `siffer-shell-${VERSION}`;
+const VERSION = '1.1.1';
+const SHELL_CACHE_PREFIX = 'siffer-shell-';
+const SHELL_CACHE = `${SHELL_CACHE_PREFIX}${VERSION}`;
 const FONT_CACHE = 'siffer-fonts-v1';
 const INDEX_URL = new URL('./index.html', self.location).href;
 
@@ -29,19 +30,17 @@ const CORE_ASSETS = [
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(SHELL_CACHE);
-    await cache.add(new Request(INDEX_URL, { cache: 'reload' }));
-    await Promise.allSettled(
-      CORE_ASSETS.map(asset => cache.add(new Request(new URL(asset, self.location).href, { cache: 'reload' })))
-    );
+    await cache.addAll(CORE_ASSETS.map(asset =>
+      new Request(new URL(asset, self.location).href, { cache: 'reload' })
+    ));
   })());
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.map(key => {
-      if (key !== SHELL_CACHE && key !== FONT_CACHE) return caches.delete(key);
-    }));
+    const oldShellCaches = keys.filter(key => key.startsWith(SHELL_CACHE_PREFIX) && key !== SHELL_CACHE);
+    await Promise.all(oldShellCaches.map(key => caches.delete(key)));
     await self.clients.claim();
   })());
 });
@@ -116,7 +115,7 @@ async function staleWhileRevalidateFonts(request, event) {
     return cached;
   }
   const response = await network;
-  return response || new Response('', { status: 504, statusText 'Gateway Timeout' });
+  return response || new Response('', { status: 504, statusText: 'Gateway Timeout' });
 }
 
 async function trimCache(cacheName, maxItems) {
